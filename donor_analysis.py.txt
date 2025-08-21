@@ -1,0 +1,70 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+
+# Load the simulated donor data (mirroring CRM export)
+df = pd.read_csv('donor_data.csv')
+
+# Data cleaning (ensure integrity, as per job responsibilities)
+df['DonationAmount'] = df['DonationAmount'].clip(lower=0)  # No negative donations
+df['ResponseRate'] = df['ResponseRate'].clip(0, 1)  # Bound between 0 and 1
+
+# Summary analysis: Aggregate by IncomeLevel for segmentation insights
+# Includes averages for donations, interactions, response rates; count of engaged donors
+summary = df.groupby('IncomeLevel').agg({
+    'DonationAmount': 'mean',
+    'NumInteractions': 'mean',
+    'ResponseRate': 'mean',
+    'Engaged': 'sum'
+}).rename(columns={
+    'DonationAmount': 'Avg_Donation',
+    'NumInteractions': 'Avg_Interactions',
+    'ResponseRate': 'Avg_Response_Rate',
+    'Engaged': 'Engaged_Count'
+})
+summary['Total_Donors'] = df.groupby('IncomeLevel').size()
+summary['Engagement_Rate'] = summary['Engaged_Count'] / summary['Total_Donors']  # For retention/engagement metrics
+
+# Export summary for reporting (e.g., campaign performance)
+summary.to_csv('donor_summary.csv')
+
+# Visualizations for communication strategies and ROI analysis
+# Bar chart: Average donations by income level (for targeted appeals)
+plt.figure()
+plt.bar(summary.index, summary['Avg_Donation'])
+plt.title('Average Donation Amount by Income Level')
+plt.xlabel('Income Level')
+plt.ylabel('Average Donation ($)')
+plt.savefig('avg_donation_bar.png')
+plt.close()
+
+# Pie chart: Engagement distribution (for stewardship and retention strategies)
+engaged_counts = df['Engaged'].value_counts()
+plt.figure()
+plt.pie(engaged_counts, labels=['Not Engaged', 'Engaged'], autopct='%1.1f%%')
+plt.title('Donor Engagement Distribution')
+plt.savefig('engagement_pie.png')
+plt.close()
+
+# Scatter plot: Interactions vs. Donation Amount (for engagement metrics tracking)
+plt.figure()
+plt.scatter(df['NumInteractions'], df['DonationAmount'], c=df['Engaged'], cmap='viridis')
+plt.title('Num Interactions vs. Donation Amount (Colored by Engaged)')
+plt.xlabel('Number of Interactions')
+plt.ylabel('Donation Amount ($)')
+plt.savefig('interactions_scatter.png')
+plt.close()
+
+# ML-Based Donor Segmentation: Use KMeans clustering on key features
+# This optimizes donor segmentation for personalized communications
+features = df[['Age', 'DonationAmount', 'NumInteractions', 'ResponseRate']]
+scaler = StandardScaler()
+features_scaled = scaler.fit_transform(features)
+kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)  # 3 segments: e.g., high-value, low-engagement, mid-tier
+df['Segment'] = kmeans.fit_predict(features_scaled)
+
+# Export clustered data for further use (e.g., in CRM for targeted strategies)
+df.to_csv('donor_clustered.csv', index=False)
+
+print("Analysis complete. Check generated files for summaries and visualizations.")
